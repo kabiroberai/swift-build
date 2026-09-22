@@ -315,6 +315,16 @@ public extension ProjectModel.BuildSettings.Platform {
 }
 
 extension ProjectModel.BuildSettings: Codable {
+    private static let platformsByCondition: [String: Platform] = {
+        var result: [String: Platform] = [:]
+        for platform in Platform.allCases {
+            for condition in platform.asConditionStrings {
+                result[condition] = platform
+            }
+        }
+        return result
+    }()
+
     private struct StringKey: CodingKey {
         var stringValue: String
         var intValue: Int?
@@ -338,42 +348,33 @@ extension ProjectModel.BuildSettings: Codable {
 
         let container = try decoder.container(keyedBy: StringKey.self)
 
-        // NOTE: unknown settings will be lost during decoding, as there is no way to tell
-        // if they are a single or multiple value setting.
+        for key in container.allKeys {
+            var settingName = key.stringValue
+            var platform: Platform?
+            if settingName.last == "]", let bracket = settingName.firstIndex(of: "[") {
+                let condition = String(settingName[settingName.index(after: bracket)..<settingName.index(before: settingName.endIndex)])
+                if let matchingPlatform = Self.platformsByCondition[condition] {
+                    platform = matchingPlatform
+                    settingName = String(settingName[..<bracket])
+                }
+            }
 
-        for key in SingleValueSetting.allCases {
-            if let value = try container.decodeIfPresent(String.self, forKey: StringKey(key.rawValue)) {
-                self[key] = value
-            }
-        }
-        for key in MultipleValueSetting.allCases {
-            if let value = try container.decodeIfPresent([String].self, forKey: StringKey(key.rawValue)) {
-                self[key] = value
-            }
-        }
-        for platform in Platform.allCases {
-            for condition in platform.asConditionStrings {
-                for declaration in Declaration.allCases {
-                    if let value = try container.decodeIfPresent([String].self, forKey: StringKey("\(declaration.rawValue)[\(condition)]")) {
-                        self.platformSpecificSettings[platform, default: [:]][declaration] = value
-                    }
+            if let value = try? container.decode(String.self, forKey: key) {
+                if let platform {
+                    singleValuePlatformSpecificSettings[platform, default: .init()][settingName] = value
+                } else {
+                    singleValueSettings[settingName] = value
                 }
-                let declarationValues = Set(Declaration.allCases.map(\.rawValue))
-                for key in SingleValueSetting.allCases {
-                    if declarationValues.contains(key.rawValue) {
-                        continue
+            } else if let values = try container.decodeIfPresent([String].self, forKey: key) {
+                if let platform {
+                    if let declaration = Declaration(rawValue: settingName) {
+                        // kept for backwards compatibility
+                        platformSpecificSettings[platform, default: [:]][declaration] = values
+                    } else {
+                        multipleValuePlatformSpecificSettings[platform, default: .init()][settingName] = values
                     }
-                    if let value = try container.decodeIfPresent(String.self, forKey: StringKey("\(key.rawValue)[\(condition)]")) {
-                        self[key, platform] = value
-                    }
-                }
-                for key in MultipleValueSetting.allCases {
-                    if declarationValues.contains(key.rawValue) {
-                        continue
-                    }
-                    if let value = try container.decodeIfPresent([String].self, forKey: StringKey("\(key.rawValue)[\(condition)]")) {
-                        self[key, platform] = value
-                    }
+                } else {
+                    multipleValueSettings[settingName] = values
                 }
             }
         }
