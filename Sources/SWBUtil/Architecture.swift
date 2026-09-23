@@ -19,6 +19,8 @@ import MachO
 #if canImport(MachO.dyld.utils)
 import MachO.dyld.utils
 #endif
+#else
+import SWBCSupport
 #endif
 
 public struct Architecture: Sendable {
@@ -44,25 +46,16 @@ public struct Architecture: Sendable {
 
     /// Returns the 32-bit counterpart of the architecture, which may be the same value.
     public var as32bit: Architecture {
-        #if canImport(Darwin)
         return Self(cputype: cputype & ~CPU_ARCH_ABI64)
-        #else
-        return Self()
-        #endif
     }
 
     /// Returns the 64-bit counterpart of the architecture, which may be the same value.
     public var as64bit: Architecture {
-        #if canImport(Darwin)
         return Self(cputype: cputype | CPU_ARCH_ABI64)
-        #else
-        return Self()
-        #endif
     }
 
     /// Returns the string representation of the architecture, or `nil` if it cannot be determined.
     public var stringValue: String? {
-        #if canImport(Darwin)
         // This only needs to consider the known 4 values as it's only for computing the host architecture build settings.
         switch cputype {
         case CPU_TYPE_ARM:
@@ -76,7 +69,6 @@ public struct Architecture: Sendable {
         default:
             break
         }
-        #endif
         return nil
     }
 
@@ -128,7 +120,26 @@ public struct Architecture: Sendable {
         }
         return nil
         #else
-        return nil
+        // The high byte of the subtype holds capability flags, not the subtype itself.
+        let subtype = UInt32(bitPattern: cpusubtype) & 0x00ff_ffff
+        switch cputype {
+        case CPU_TYPE_ARM64:
+            return subtype == 2 ? "arm64e" : "arm64"
+        case CPU_TYPE_X86_64:
+            return subtype == 8 ? "x86_64h" : "x86_64"
+        case CPU_TYPE_ARM:
+            switch subtype {
+            case 0: return "arm"
+            case 9: return "armv7"
+            case 11: return "armv7s"
+            case 12: return "armv7k"
+            default: return nil
+            }
+        case CPU_TYPE_I386:
+            return "i386"
+        default:
+            return nil
+        }
         #endif
     }
 }
