@@ -14,11 +14,7 @@ package import SWBUtil
 
 extension MachO.Slice {
     package func targetTripleStrings(infoLookup: any PlatformInfoLookup) throws -> [String] {
-        #if canImport(Darwin)
         return try buildVersions().map { $0.targetTripleString(arch: self.arch, infoLookup: infoLookup) }
-        #else
-        throw BinaryReaderError.parseError("Mach-O parsing not supported on this platform")
-        #endif
     }
 }
 
