@@ -165,7 +165,7 @@ open class LinkerSpec : CommandLineToolSpec, @unchecked Sendable {
     /// Custom entry point for constructing linker tasks.
     public func constructLinkerTasks(_ cbc: CommandBuildContext, _ delegate: any TaskGenerationDelegate, libraries: [LibrarySpecifier], usedTools: [CommandLineToolSpec: Set<FileTypeSpec>]) async {
         /// Delegate to the generic machinery.
-        await delegate.createTask(type: self, ruleInfo: defaultRuleInfo(cbc, delegate), commandLine: commandLineFromTemplate(cbc, delegate, optionContext: discoveredCommandLineToolSpecInfo(cbc.producer, cbc.scope, delegate)).map(\.asString), environment: environmentFromSpec(cbc, delegate), workingDirectory: cbc.producer.defaultWorkingDirectory, inputs: cbc.inputs.map({ $0.absolutePath }), outputs: [cbc.output], action: createTaskAction(cbc, delegate), execDescription: resolveExecutionDescription(cbc, delegate), enableSandboxing: enableSandboxing)
+        await delegate.createTask(type: self, ruleInfo: defaultRuleInfo(cbc, delegate), commandLine: commandLineFromTemplate(cbc, delegate, optionContext: discoveredCommandLineToolSpecInfo(cbc.producer, cbc.scope, delegate)).map(\.asString), environment: environmentFromSpec(cbc, delegate), workingDirectory: cbc.producer.defaultWorkingDirectory, inputs: cbc.inputs.map { delegate.createNode($0.absolutePath) } + cbc.commandOrderingInputs, outputs: [delegate.createNode(cbc.output)] + cbc.commandOrderingOutputs, action: createTaskAction(cbc, delegate), execDescription: resolveExecutionDescription(cbc, delegate), enableSandboxing: enableSandboxing)
     }
 }
 

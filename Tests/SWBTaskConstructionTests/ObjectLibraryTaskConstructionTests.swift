@@ -13,6 +13,7 @@
 import Testing
 
 import SWBCore
+import SWBProtocol
 import SWBTaskConstruction
 import SWBTestSupport
 import SWBUtil
@@ -72,8 +73,54 @@ fileprivate struct ObjectLibraryTaskConstructionTests: CoreBasedTests {
                     .namePattern(.any),
                 ])
                 task.checkOutputs([
-                    .pathPattern(.suffix("Library.objlib"))
+                    .pathPattern(.suffix("Library.objlib")),
+                    .namePattern(.and(.prefix("Linked Binary "), .suffix("Library.objlib"))),
                 ])
+            }
+        }
+    }
+
+    @Test(.requireSDKs(.host), .skipHostOS(.windows, "Windows does not set product permissions"), arguments: [false, true])
+    func objectLibraryInstallPostprocessing(skipInstall: Bool) async throws {
+        let testProject = TestProject(
+            "aProject",
+            groupTree: TestGroup("Sources", children: [TestFile("a.c")]),
+            buildConfigurations: [
+                TestBuildConfiguration("Debug", buildSettings: [
+                    "PRODUCT_NAME": "$(TARGET_NAME)",
+                    "CODE_SIGNING_ALLOWED": "NO",
+                    "INSTALL_PATH": "/usr/local/lib",
+                    "INSTALL_OWNER": "exampleUser",
+                    "INSTALL_GROUP": "exampleGroup",
+                    "INSTALL_MODE_FLAG": "u+w,go-w,a+rX",
+                    "SKIP_INSTALL": skipInstall ? "YES" : "NO",
+                ]),
+            ],
+            targets: [
+                TestStandardTarget(
+                    "Library",
+                    type: .objectLibrary,
+                    buildPhases: [TestSourcesBuildPhase(["a.c"])]
+                ),
+            ]
+        )
+        let tester = try await TaskConstructionTester(getCore(), testProject)
+
+        // The graph integrity checks must establish ordering without using the
+        // object library path, since chown and chmod both mutate that path.
+        await tester.checkBuild(BuildParameters(action: .install, configuration: "Debug"), runDestination: .host) { results in
+            results.checkNoDiagnostics()
+            results.checkTask(.matchRuleType("AssembleObjectLibrary")) { task in
+                task.checkOutputs([
+                    .pathPattern(.suffix("Library.objlib")),
+                    .namePattern(.and(.prefix("Linked Binary "), .suffix("Library.objlib"))),
+                ])
+            }
+            results.checkTask(.matchRuleType("SetOwnerAndGroup")) { task in
+                results.checkTaskFollows(task, .matchRuleType("AssembleObjectLibrary"))
+            }
+            results.checkTask(.matchRuleType("SetMode")) { task in
+                results.checkTaskFollows(task, .matchRuleType("SetOwnerAndGroup"))
             }
         }
     }

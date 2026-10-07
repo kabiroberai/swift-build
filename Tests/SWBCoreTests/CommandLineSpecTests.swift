@@ -1465,6 +1465,36 @@ import SWBMacro
         ])
     }
 
+    @Test
+    func linkerTaskOrdering() async throws {
+        let core = try await getCore()
+        let linkerSpec = try core.specRegistry.getSpec(ofType: ObjectLibraryAssemblerSpec.self)
+        let producer = try MockCommandProducer(core: core, productTypeIdentifier: "org.swift.product-type.library.object", platform: "macosx")
+        let delegate = try CapturingTaskGenerationDelegate(producer: producer, userPreferences: .defaultForTesting)
+        let table = MacroValueAssignmentTable(namespace: core.specRegistry.internalMacroNamespace)
+        let scope = MacroEvaluationScope(table: table)
+        let fileType = try core.specRegistry.getSpec("compiled.mach-o.objfile", ofType: FileTypeSpec.self)
+        let input = Path.root.join("tmp/a.o")
+        let output = Path.root.join("tmp/Library.objlib")
+        let orderingInput = delegate.createVirtualNode("Linker input ready")
+        let orderingOutput = delegate.createVirtualNode("Linked Binary \(output.str)")
+        let cbc = CommandBuildContext(
+            producer: producer,
+            scope: scope,
+            inputs: [FileToBuild(absolutePath: input, fileType: fileType)],
+            output: output,
+            commandOrderingInputs: [orderingInput],
+            commandOrderingOutputs: [orderingOutput]
+        )
+
+        await linkerSpec.constructLinkerTasks(cbc, delegate, libraries: [], usedTools: [:])
+
+        #expect(delegate.shellTasks.count == 1)
+        let task = try #require(delegate.shellTasks.only)
+        task.checkInputs([.path(input.str), .name(orderingInput.name)])
+        task.checkOutputs([.path(output.str), .name(orderingOutput.name)])
+    }
+
     /// Tests for individual linker build settings.
     @Test
     func linkerBuildSettings() async throws {
