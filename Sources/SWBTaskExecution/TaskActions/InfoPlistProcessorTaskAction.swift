@@ -817,6 +817,8 @@ public final class InfoPlistProcessorTaskAction: TaskAction
 
         // Only add the default keys if the corresponding build setting is defined, so that we don't overwrite static values for these keys which may be in the input Info.plist
         updateContent(&content, key: "CFBundleName", buildSetting: BuiltinMacros.PRODUCT_NAME.name)
+        // INFOPLIST_KEY_CFBundleName takes precedence over PRODUCT_NAME
+        updateContentWithInfoPlistKeyMacroValue(&content, "CFBundleName")
         // <rdar://64456434> This should only be added if we will actually produce an executable
         updateContent(&content, key: "CFBundleExecutable", buildSetting: BuiltinMacros.EXECUTABLE_NAME.name)
         updateContent(&content, key: "CFBundleVersion", buildSetting: BuiltinMacros.CURRENT_PROJECT_VERSION.name)

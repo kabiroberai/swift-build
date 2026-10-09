@@ -1405,6 +1405,42 @@ fileprivate struct InfoPlistProcessorTaskTests: CoreBasedTests {
         }
     }
 
+    @Test
+    func generatedBundleName() async throws {
+        let cases: [(bundleName: String?, productName: String?, expectedName: String?)] = [
+            (nil, "TestApp", "TestApp"),
+            ("Custom Bundle", "TestApp", "Custom Bundle"),
+            ("$(PRODUCT_NAME) Custom", "TestApp", "TestApp Custom"),
+            ("", "TestApp", nil),
+            ("Custom Bundle", nil, "Custom Bundle"),
+            (nil, nil, "Original Bundle"),
+        ]
+
+        for platformName in ["macosx", "iphoneos"] {
+            for testCase in cases {
+                let scope = try createMockScope { namespace, table in
+                    table.push(BuiltinMacros.GENERATE_INFOPLIST_FILE, literal: true)
+                    if let bundleName = testCase.bundleName {
+                        table.push(BuiltinMacros.INFOPLIST_KEY_CFBundleName, namespace.parseString(bundleName))
+                    }
+                    if let productName = testCase.productName {
+                        table.push(BuiltinMacros.PRODUCT_NAME, literal: productName)
+                    } else {
+                        try table.remove(namespace.declareStringMacro("PRODUCT_NAME"))
+                    }
+                }
+
+                try await createAndRunTaskAction(inputPlistData: ["CFBundleName": "Original Bundle"], scope: scope, platformName: platformName) { result, dict, outputDelegate in
+                    #expect(result == .succeeded)
+                    #expect(dict["CFBundleName"]?.stringValue == testCase.expectedName)
+                    #expect(dict["CFBundleExecutable"]?.stringValue == "TestApp")
+                    #expect(scope.evaluate(BuiltinMacros.PRODUCT_NAME) == (testCase.productName ?? ""))
+                    #expect(outputDelegate.errors == [])
+                }
+            }
+        }
+    }
+
     /// Test that `GENERATE_INFOPLIST_FILE` merely being enabled doesn't remove existing keys in the Info.plist if the corresponding build setting is not defined. For example, if `MARKETING_VERSION` is not set, any value for `CFBundleShortVersionString` in the input Info.plist should remain in the output Info.plist.
     @Test
     func generatedInfoPlistWithExistingKeys() async throws {

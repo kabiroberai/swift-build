@@ -3849,6 +3849,16 @@ When this setting is enabled:
                 Description = "When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [CFBundleDisplayName](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundledisplayname) key in the `Info.plist` file to the value of this build setting.";
             },
             {
+                Name = INFOPLIST_KEY_CFBundleName;
+                Type = String;
+                Category = "Info.plist Values";
+                ConditionFlavors = (
+                    sdk,
+                );
+                DisplayName = "Bundle Name";
+                Description = "When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [CFBundleName](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundlename) key in the `Info.plist` file to the value of this build setting.";
+            },
+            {
                 Name = INFOPLIST_KEY_ITSAppUsesNonExemptEncryption;
                 Type = Boolean;
                 Category = "Info.plist Values";

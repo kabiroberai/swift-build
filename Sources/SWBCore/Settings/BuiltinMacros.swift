@@ -1290,6 +1290,7 @@ public final class BuiltinMacros {
     // MARK: Info.plist Properties
     // Info.plist Keys -  General
     public static let INFOPLIST_KEY_CFBundleDisplayName = BuiltinMacros.declareStringMacro("INFOPLIST_KEY_CFBundleDisplayName")
+    public static let INFOPLIST_KEY_CFBundleName = BuiltinMacros.declareStringMacro("INFOPLIST_KEY_CFBundleName")
     public static let INFOPLIST_KEY_LSApplicationCategoryType = BuiltinMacros.declareEnumMacro("INFOPLIST_KEY_LSApplicationCategoryType") as EnumMacroDeclaration<ApplicationCategory>
     public static let INFOPLIST_KEY_NSHumanReadableCopyright = BuiltinMacros.declareStringMacro("INFOPLIST_KEY_NSHumanReadableCopyright")
     public static let INFOPLIST_KEY_NSPrincipalClass = BuiltinMacros.declareStringMacro("INFOPLIST_KEY_NSPrincipalClass")
@@ -2623,6 +2624,7 @@ public final class BuiltinMacros {
     private static let allInfoPlistMacros = [
         // Info.plist Keys - General
         INFOPLIST_KEY_CFBundleDisplayName,
+        INFOPLIST_KEY_CFBundleName,
         INFOPLIST_KEY_LSApplicationCategoryType,
         INFOPLIST_KEY_NSHumanReadableCopyright,
         INFOPLIST_KEY_NSPrincipalClass,

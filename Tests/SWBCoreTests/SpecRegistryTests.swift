@@ -410,7 +410,7 @@ import SWBUtil
                 #expect(option.localizedDescription == "When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [\(keyName)](\(url)) key in the Info.plist file to an entry suitable for a multi-window application.")
             case "UILaunchScreen":
                 #expect(option.localizedDescription == "When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [\(keyName)](\(url)) key in the Info.plist file to an empty dictionary.")
-            case _ where legacyKeyMappings.values.contains(keyName):
+            case _ where legacyKeyMappings.contains(option.name):
                 XCTAssertMatch(option.localizedDescription, .suffix("\n\n\(generateSentenceWithURL)"))
             default:
                 XCTAssertMatch(option.localizedDescription, .or(.equal(generateSentenceWithURL), .equal(generateSentenceWithoutURL)))
