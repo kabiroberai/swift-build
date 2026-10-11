@@ -399,6 +399,76 @@ fileprivate struct BuildDescriptionTests: CoreBasedTests {
         }
     }
 
+    @Test(.requireSDKs(.macOS), arguments: [false, true])
+    func missingXCFrameworkInvalidatesCachedDescription(fromDisk: Bool) async throws {
+        try await withTemporaryDirectory { tmpDirPath in
+            let core = try await getCore()
+            let workspace = try TestWorkspace("Test", sourceRoot: tmpDirPath, projects: [
+                TestProject(
+                    "aProject",
+                    groupTree: TestGroup("Sources", children: [TestFile("main.c"), TestFile("Support.xcframework")]),
+                    buildConfigurations: [TestBuildConfiguration("Debug", buildSettings: [
+                        "PRODUCT_NAME": "$(TARGET_NAME)",
+                        "CODE_SIGNING_ALLOWED": "NO",
+                        "ALWAYS_SEARCH_USER_PATHS": "NO",
+                        "USE_HEADERMAP": "NO",
+                    ])],
+                    targets: [TestStandardTarget("Tool", type: .commandLineTool, buildPhases: [
+                        TestSourcesBuildPhase(["main.c"]),
+                        TestFrameworksBuildPhase(["Support.xcframework"]),
+                    ])]
+                )
+            ]).load(core)
+            let fs = PseudoFS()
+            let sourceRoot = workspace.projects[0].sourceRoot
+            try fs.createDirectory(sourceRoot, recursive: true)
+            try fs.write(sourceRoot.join("main.c"), contents: "int main(void) { return 0; }")
+            let frameworkPath = sourceRoot.join("Support.xcframework")
+
+            func load(_ manager: BuildDescriptionManager) async throws -> BuildDescriptionRetrievalInfo {
+                let request = try await planRequest(for: workspace, activeRunDestination: .macOS, fs: fs, includingTargets: { _ in true })
+                return try #require(await manager.getNewOrCachedBuildDescription(
+                    request,
+                    clientDelegate: MockTestTaskPlanningClientDelegate(hostOS: core.hostOperatingSystem),
+                    constructionDelegate: MockTestBuildDescriptionConstructionDelegate()
+                ))
+            }
+            func errors(_ info: BuildDescriptionRetrievalInfo) -> [String] {
+                info.buildDescription.diagnostics.values.flatMap { $0 }.filter { $0.behavior == .error }.map { $0.data.description }
+            }
+
+            var manager = BuildDescriptionManager(fs: fs, buildDescriptionMemoryCacheEvictionPolicy: .never)
+            let initial = try await load(manager)
+            #expect(initial.source == .new)
+            let missing = "There is no XCFramework found at '\(frameworkPath.str)'."
+            #expect(errors(initial).contains(missing))
+
+            // Confirm the failed description is actually cached, including across a session restart.
+            if fromDisk {
+                manager = BuildDescriptionManager(fs: fs, buildDescriptionMemoryCacheEvictionPolicy: .never)
+            }
+            let cached = try await load(manager)
+            #expect(cached.source == (fromDisk ? .onDiskCache : .inMemoryCache))
+            #expect(errors(cached).contains(missing))
+
+            let xcframework = try XCFramework(version: Version(1, 0), libraries: [
+                XCFramework.Library(libraryIdentifier: "macos-arm64_x86_64", supportedPlatform: "macos",
+                                    supportedArchitectures: ["arm64", "x86_64"], platformVariant: nil,
+                                    libraryPath: Path("Support.framework"), binaryPath: Path("Support.framework/Support"), headersPath: nil),
+            ])
+            try fs.createDirectory(frameworkPath, recursive: true)
+            try await fs.writeXCFramework(frameworkPath, xcframework, infoLookup: core)
+            if fromDisk {
+                manager = BuildDescriptionManager(fs: fs, buildDescriptionMemoryCacheEvictionPolicy: .never)
+            }
+            let repaired = try await load(manager)
+            #expect(repaired.source == .new)
+            #expect(errors(repaired).isEmpty)
+            #expect(repaired.buildDescription.tasks.contains { $0.ruleInfo.first == "ProcessXCFramework" })
+            #expect(try await load(manager).source == .inMemoryCache)
+        }
+    }
+
     /// A cached build description, looked up by its `buildDescriptionID` via the `.cachedOnly` path, may be reused
     /// across a workspace reload as long as the reloaded workspace still contains the description's targets — index
     /// clients rely on reusing a description after a PIF change. It must be rejected only when a referenced target was

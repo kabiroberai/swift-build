@@ -92,6 +92,7 @@ final class XCFrameworkTaskProducer: StandardTaskProducer, TaskProducer {
             for buildFile in xcframeworksFor(phase: buildPhase) {
                 do {
                     let xcframeworkPath = buildFile.absolutePath
+                    access(path: xcframeworkPath)
                     let expectedSignature = (context.workspaceContext.workspace.lookupReference(for: buildFile.reference.guid) as? FileReference)?.expectedSignature
                     try context.globalProductPlan.xcframeworkContext.add(xcframeworkPath, for: configuredTarget, expectedSignature: expectedSignature) { xcframework in
                         guard let library = xcframework.findLibrary(sdk: context.sdk, sdkVariant: context.sdkVariant, architectures: context.settings.globalScope.evaluate(BuiltinMacros.ARCHS)) else {
@@ -135,7 +136,6 @@ final class XCFrameworkTaskProducer: StandardTaskProducer, TaskProducer {
                     expectedSignatures = nil
                 }
 
-                access(path: config.path)
                 await context.processXCFrameworkLibrarySpec.constructTasks(CommandBuildContext(producer: context, scope: scope, inputs: [FileToBuild(context: context, absolutePath: config.path)], outputs: config.outputs, commandOrderingInputs: outputDirectoryIsBuildDirectory ? [delegate.createBuildDirectoryNode(absolutePath: config.outputDirectory)] : []), delegate, platform: config.platform, environment: config.environment, libraryIdentifier: config.libraryIdentifier, outputDirectory: config.outputDirectory, libraryPath: config.libraryPath, expectedSignatures: expectedSignatures)
 
                 if scope.evaluate(BuiltinMacros.ENABLE_SIGNATURE_AGGREGATION) {
