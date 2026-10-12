@@ -501,12 +501,12 @@ if useLocalDependencies {
     let relatedDependenciesBranch = "release/6.4.x"
 
     package.dependencies += [
-        .package(url: "https://github.com/swiftlang/swift-driver.git", branch: relatedDependenciesBranch),
+        .package(url: "https://github.com/xtool-org/swift-driver.git", branch: relatedDependenciesBranch),
         .package(url: "https://github.com/apple/swift-system.git", .upToNextMajor(from: "1.5.0")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.3"),
         .package(url: "https://github.com/swiftlang/swift-tools-protocols.git", branch: relatedDependenciesBranch),
     ]
     if !useLLBuildFramework {
-        package.dependencies += [.package(url: "https://github.com/swiftlang/swift-llbuild.git", branch: relatedDependenciesBranch),]
+        package.dependencies += [.package(url: "https://github.com/xtool-org/swift-llbuild.git", branch: relatedDependenciesBranch),]
     }
 }

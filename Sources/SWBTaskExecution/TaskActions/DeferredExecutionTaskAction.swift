@@ -37,34 +37,8 @@ public final class DeferredExecutionTaskAction: TaskAction {
     }
 }
 
-fileprivate extension CommandResult {
-    init(_ exitStatus: Processes.ExitStatus) {
-        if exitStatus.isSuccess {
-            self = .succeeded
-        } else if exitStatus.wasCanceled {
-            self = .cancelled
-        } else {
-            self = .failed
-        }
-    }
-}
-
 extension TaskAction {
     func spawn(commandLine: [String], environment: [String: String], workingDirectory: Path, dynamicExecutionDelegate: any DynamicTaskExecutionDelegate, clientDelegate: any TaskExecutionClientDelegate, processDelegate: any ProcessDelegate) async throws {
-        guard dynamicExecutionDelegate.allowsExternalToolExecution else {
-            try await dynamicExecutionDelegate.spawn(commandLine: commandLine, environment: environment, workingDirectory: workingDirectory, processDelegate: processDelegate)
-            return
-        }
-        switch try await clientDelegate.executeExternalTool(commandLine: commandLine, workingDirectory: workingDirectory, environment: environment) {
-        case .deferred:
-            try await dynamicExecutionDelegate.spawn(commandLine: commandLine, environment: environment, workingDirectory: workingDirectory, processDelegate: processDelegate)
-        case let .result(status, stdout, stderr):
-            // NOTE: This is not strictly correct, as we really should forward the merged output in the same order it was emitted, rather than all of stdout and then all of stderr. But we need much better APIs in order to do that, and for the current (Swift Playgrounds) use case it shouldn't matter in practice.
-            let pid = llbuild_pid_t.invalid
-            processDelegate.processStarted(pid: pid)
-            processDelegate.processHadOutput(output: Array(stdout))
-            processDelegate.processHadOutput(output: Array(stderr))
-            processDelegate.processFinished(result: .init(result: .init(status), exitStatus: status.isSuccess ? 0 : 1, pid: pid))
-        }
+        try await dynamicExecutionDelegate.spawn(commandLine: commandLine, environment: environment, workingDirectory: workingDirectory, processDelegate: processDelegate)
     }
 }

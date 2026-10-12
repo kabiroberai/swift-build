@@ -1444,6 +1444,35 @@ private final class InProcessTool:  SWBLLBuild.Tool {
 internal final class OperationSystemAdaptor: SWBLLBuild.BuildSystemDelegate, ActivityReporter {
     var fs: (any SWBLLBuild.FileSystem)? { return operation.delegate.fs.map(FileSystemImpl.init) }
 
+    func executeProcess(_ request: SWBLLBuild.ProcessExecutionRequest) async -> SWBLLBuild.ProcessExecutionResult? {
+        guard userPreferences.allowsExternalToolExecution else { return nil }
+        do {
+            switch try await operation.clientDelegate.executeExternalTool(
+                commandLine: request.commandLine,
+                workingDirectory: request.workingDirectory.isEmpty ? nil : Path(request.workingDirectory),
+                environment: request.environment
+            ) {
+            case .deferred:
+                return nil
+            case let .result(status, stdout, stderr):
+                let exitStatus: Int32
+                // llbuild expects the raw wait status, not the decoded exit code.
+                switch status {
+                case .exit(let code):
+                    exitStatus = (code & 0xff) << 8
+                case .uncaughtSignal(let signal):
+                    exitStatus = signal & 0x7f
+                }
+                let result: CommandResult = status.isSuccess ? .succeeded : status.wasCanceled ? .cancelled : .failed
+                return .init(result: result, exitStatus: exitStatus, output: Array(stdout) + Array(stderr))
+            }
+        } catch is CancellationError {
+            return .init(result: .cancelled, exitStatus: -1)
+        } catch {
+            return .init(result: .failed, exitStatus: -1, error: error.localizedDescription)
+        }
+    }
+
     /// The operation this adaptor is being used for.
     ///
     /// This is mutable because we reuse the adaptor for multiple builds.
